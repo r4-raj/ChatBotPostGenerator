@@ -1,6 +1,7 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Toast from "@/components/Contentgenerate/Toast";
 
 export default function CreateBusiness() {
 	const [businessName, setBusinessName] = useState("");
@@ -9,6 +10,21 @@ export default function CreateBusiness() {
 	const [errorMessage, setErrorMessage] = useState(null);
 	const [isSubmitted, setIsSubmitted] = useState(false);
   const router = useRouter();
+
+  // Restore saved values on mount
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('onboardingStep1') || '{}');
+      if (saved.businessName) setBusinessName(saved.businessName);
+      if (saved.website) setWebsiteUrl(saved.website);
+    } catch (_) {}
+  }, []);
+
+  // Auto-save on change
+  useEffect(() => {
+    const payload = { businessName, website: websiteUrl };
+    sessionStorage.setItem('onboardingStep1', JSON.stringify(payload));
+  }, [businessName, websiteUrl]);
 
 	// progress steps configuration
 	const steps = ['Name & Website','Basic Info','Branding','Audience','Schedule'];
@@ -42,7 +58,7 @@ export default function CreateBusiness() {
 
 		try {
 			// Save step 1 data to localStorage with correct field names for backend
-			localStorage.setItem('onboardingStep1', JSON.stringify({ businessName, website: websiteUrl }));
+      sessionStorage.setItem('onboardingStep1', JSON.stringify({ businessName, website: websiteUrl }));
 			await new Promise((resolve) => setTimeout(resolve, 500));
 			setIsSubmitted(true);
 			// Navigate to step 2 on success

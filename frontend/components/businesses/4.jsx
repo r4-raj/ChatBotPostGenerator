@@ -1,7 +1,7 @@
 // KnowAudienceForm.jsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 
@@ -11,6 +11,26 @@ export default function KnowAudienceForm() {
   const [keyMessages, setKeyMessages] = useState('');
   const [contentThemes, setContentThemes] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Restore saved values on mount
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('onboardingStep4') || '{}');
+      if (saved.targetAudience) setAudience(saved.targetAudience);
+      if (saved.keyMessages) setKeyMessages(saved.keyMessages);
+      if (saved.contentThemes) setContentThemes(saved.contentThemes);
+    } catch (_) {}
+  }, []);
+
+  // Auto-save when values change
+  useEffect(() => {
+    const payload = {
+      targetAudience: audience,
+      keyMessages,
+      contentThemes,
+    };
+    sessionStorage.setItem('onboardingStep4', JSON.stringify(payload));
+  }, [audience, keyMessages, contentThemes]);
 
   function handleBack() {
     router.push('/businesses/create/3');

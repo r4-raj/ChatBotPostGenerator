@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 
+
 const plans = [
 	{
 		name: "Free",
@@ -16,7 +17,7 @@ const plans = [
 		button: "Continue with Free",
 		highlight: false,
 		color: "border-gray-200",
-		href: "#",
+		href: "/content/generate",
 	},
 	{
 		name: "Starter",
@@ -90,10 +91,13 @@ function CheckIcon() {
 	);
 }
 
+
 export default function ConfirmPlan({businessName}) {
+	
 	// You can get the business name from router/query/localStorage if needed
 	// For now, hardcode as in screenshot
-
+	const decodedName = typeof businessName === 'string' ? decodeURIComponent(businessName) : '';
+	const displayName = decodedName.replace(/\s+/g, '-');
 
 	return (
 		<div className="min-h-screen bg-gray-50 flex flex-col items-center pt-32 pb-16 px-2">
@@ -103,7 +107,7 @@ export default function ConfirmPlan({businessName}) {
 					<h1 className="text-2xl md:text-3xl font-bold text-gray-900">Business Created Successfully!</h1>
 				</div>
 				<p className="text-gray-700 text-center mb-2">
-					<span className="font-semibold">{businessName}</span> is ready to go. Now let's choose your subscription plan.
+					<span className="font-semibold">{displayName}</span> is ready to go. Now let's choose your subscription plan.
 				</p>
 				<h2 className="text-lg md:text-xl font-semibold text-gray-900 mt-4 mb-2">Choose Your Subscription Plan</h2>
 				<p className="text-gray-600 mb-6 text-center">Select the plan that best fits your business needs.</p>

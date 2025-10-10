@@ -9,6 +9,26 @@ export default function ReviewDetails() {
   const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
 
+  // Restore previously saved values on mount
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('onboardingStep2') || '{}');
+      if (saved.businessDescription) setDescription(saved.businessDescription);
+      if (saved.industry) setIndustry(saved.industry);
+      if (saved.companySize) setCompanySize(saved.companySize);
+    } catch (_) {}
+  }, []);
+
+  // Auto-save whenever fields change
+  useEffect(() => {
+    const payload = {
+      businessDescription: description,
+      industry,
+      companySize,
+    };
+    sessionStorage.setItem('onboardingStep2', JSON.stringify(payload));
+  }, [description, industry, companySize]);
+
 	// progress steps configuration (this page = step 2)
 	const steps = ['Name & Website','Basic Info','Branding','Audience','Schedule'];
 	const currentStep = 2;

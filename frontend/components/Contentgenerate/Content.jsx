@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Instagram, Linkedin, Facebook, Twitter } from "lucide-react";
 import { useRouter } from 'next/navigation'; // Correct import for Next.js App Router
 
@@ -18,6 +18,7 @@ const GenerateAIContent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null); // Optional: to show a temporary result on this page
+  const [history, setHistory] = useState([]);
   const router = useRouter();
 
   const handlePlatformChange = (platformId) => {
@@ -26,6 +27,16 @@ const GenerateAIContent = () => {
       [platformId]: !prevSelected[platformId],
     }));
   };
+
+  // Load history on mount
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('generatedHistory') || '[]');
+      setHistory(Array.isArray(saved) ? saved : []);
+    } catch (_) {
+      setHistory([]);
+    }
+  }, []);
 
   /**
    * Helper function to save the generated content to the database.
@@ -91,6 +102,23 @@ const GenerateAIContent = () => {
 
       // --- Step 3: Store in localStorage for the next page and navigate ---
       localStorage.setItem('generatedContent', JSON.stringify(generatedData));
+
+      // Save lightweight entry to history for the Recent section
+      try {
+        const existing = JSON.parse(localStorage.getItem('generatedHistory') || '[]');
+        const firstPlatform = Object.keys(generatedData)[0];
+        const item = generatedData[firstPlatform];
+        const title = (item?.postContent || '').split('\n')[0].slice(0, 80);
+        const entry = {
+          id: Date.now(),
+          title: title || 'Generated Post',
+          preview: (item?.postContent || '').slice(0, 180),
+          createdAt: new Date().toISOString(),
+        };
+        const newHistory = [entry, ...(Array.isArray(existing) ? existing : [])].slice(0, 10);
+        localStorage.setItem('generatedHistory', JSON.stringify(newHistory));
+        setHistory(newHistory);
+      } catch (_) {}
       router.push('/content/post');
 
     } catch (err) {
@@ -188,6 +216,30 @@ const GenerateAIContent = () => {
           </div>
         )}
       </div>
+
+      {/* Recent AI Generations - moved below Target Platforms */}
+      <section className="mt-6">
+        <h2 className="text-xl font-semibold text-slate-800 mb-3">Recent AI Generations</h2>
+        {history && history.length > 0 ? (
+          <div className="space-y-3">
+            {history.map((h) => (
+              <div key={h.id} className="bg-blue-50/60 border border-blue-100 rounded-lg p-4 flex items-start justify-between">
+                <div className="pr-4">
+                  <h3 className="font-medium text-blue-900 mb-1">{h.title}</h3>
+                  <p className="text-blue-800/80 text-sm line-clamp-1">{h.preview}</p>
+                  <p className="text-xs text-blue-700/70 mt-1">Generated {new Date(h.createdAt).toLocaleString()}</p>
+                </div>
+                <button onClick={() => router.push('/content/post')} className="text-blue-600 text-sm font-medium hover:underline whitespace-nowrap">View →</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white border border-slate-200 rounded-lg p-6 text-center">
+            <h3 className="text-slate-800 font-semibold">No generated content yet</h3>
+            <p className="text-slate-600 text-sm mt-1">Create one and grow fast with AI-powered posts.</p>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

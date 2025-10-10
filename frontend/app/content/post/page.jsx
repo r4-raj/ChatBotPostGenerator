@@ -1,6 +1,7 @@
 "use client";
 import PostDetailPage from "@/components/Contentgenerate/post";
 import BusinessHeader from "@/components/businesses/logo";
+import Toast from "@/components/Contentgenerate/Toast";
 import { useEffect, useState } from "react";
 
 const MyPostView = () => {
@@ -24,7 +25,9 @@ const MyPostView = () => {
   return (
     <>
       <BusinessHeader />
+      <div className="pt-20" />
       <PostDetailPage generatedData={postData} />
+      <Toast />
     </>
   );
 };

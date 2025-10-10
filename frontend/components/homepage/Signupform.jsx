@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // --- Icon Components ---
 // Moved icons into this file to resolve the compilation error.
@@ -31,6 +31,19 @@ export default function SignupPage() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    fetch(`${apiUrl}/profile/me`, { headers: { Authorization: `Bearer ${token}` }})
+      .then((res) => {
+        if (res.ok) window.location.replace('/content/generate');
+        else window.location.replace('/businesses/create');
+      })
+      .catch(() => window.location.replace('/businesses/create'));
+  }, []);
 
   const handleSignupSubmit = async (e) => {
     e.preventDefault();
@@ -69,7 +82,8 @@ export default function SignupPage() {
       const data = await response.json();
       console.log('Registration successful!', data.message);
       
-      // Redirect to login page after successful registration
+      // Set flash message and redirect to login
+      sessionStorage.setItem('flashMessage', 'Account created! Please sign in.');
       window.location.href = '/login';
       
     } catch (err) {

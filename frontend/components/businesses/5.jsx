@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { ChevronLeftIcon, CheckIcon } from '@heroicons/react/24/solid';
 
@@ -19,6 +20,24 @@ export default function SetScheduleForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Restore saved values on mount
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('onboardingStep5') || '{}');
+      if (saved.postingFrequency) setFrequency(saved.postingFrequency);
+      if (saved.timezone) setTimezone(saved.timezone);
+    } catch (_) {}
+  }, []);
+
+  // Auto-save on change
+  useEffect(() => {
+    const payload = {
+      postingFrequency: frequency,
+      timezone,
+    };
+    sessionStorage.setItem('onboardingStep5', JSON.stringify(payload));
+  }, [frequency, timezone]);
+
   // progress steps (this page = step 5)
   const steps = ['Name & Website','Basic Info','Branding','Audience','Schedule'];
   const currentStep = 5;
@@ -31,10 +50,10 @@ export default function SetScheduleForm() {
 
     try {
       // Read all step data from localStorage
-      const step1Data = JSON.parse(localStorage.getItem('onboardingStep1') || '{}');
-      const step2Data = JSON.parse(localStorage.getItem('onboardingStep2') || '{}');
-      const step3Data = JSON.parse(localStorage.getItem('onboardingStep3') || '{}');
-      const step4Data = JSON.parse(localStorage.getItem('onboardingStep4') || '{}');
+      const step1Data = JSON.parse(sessionStorage.getItem('onboardingStep1') || '{}');
+      const step2Data = JSON.parse(sessionStorage.getItem('onboardingStep2') || '{}');
+      const step3Data = JSON.parse(sessionStorage.getItem('onboardingStep3') || '{}');
+      const step4Data = JSON.parse(sessionStorage.getItem('onboardingStep4') || '{}');
 
       // Extract businessName from step1Data
       const businessName = step1Data.businessName;
@@ -54,7 +73,7 @@ export default function SetScheduleForm() {
 
       // Send to backend (correct endpoint)
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const token = localStorage.getItem('authToken');
+      const token = sessionStorage.getItem('authToken');
       if (!token) {
         throw new Error('No authentication token found. Please log in again.');
       }
@@ -72,11 +91,12 @@ export default function SetScheduleForm() {
         throw new Error(errorData.message || 'Failed to create business profile.');
       }
 
-      // Clean up localStorage after successful submission
-      localStorage.removeItem('onboardingStep1');
-      localStorage.removeItem('onboardingStep2');
-      localStorage.removeItem('onboardingStep3');
-      localStorage.removeItem('onboardingStep4');
+      // Set success toast and clean up session storage after successful submission
+      sessionStorage.setItem('flashMessage', 'Business created successfully');
+      sessionStorage.removeItem('onboardingStep1');
+      sessionStorage.removeItem('onboardingStep2');
+      sessionStorage.removeItem('onboardingStep3');
+      sessionStorage.removeItem('onboardingStep4');
 
       router.push(`/subscription/${businessName}/confrm-plan`);
     } catch (err) {
@@ -90,6 +110,7 @@ export default function SetScheduleForm() {
     <div className="bg-slate-50 min-h-screen">
       <main className="py-12">
         <div className="max-w-3xl mx-auto px-6">
+        
 
           {/* Progress steps */}
           <div className="max-w-3xl mx-auto mb-6">

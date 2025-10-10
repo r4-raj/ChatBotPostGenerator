@@ -1,3 +1,4 @@
+"use client";
 import React, { useState } from "react";
 
 const CheckCircleIcon = ({ className = "w-5 h-5" }) => (
@@ -47,7 +48,9 @@ const XIcon = () => (
   </div>
 );
 
+
 export default function Pricing() {
+  const router = useRouter();
   const [isAnnual, setIsAnnual] = useState(false);
   return (
     <div>
@@ -328,7 +331,7 @@ export default function Pricing() {
                   <span className="text-4xl font-bold text-gray-900">Free</span>
                   <span className="text-gray-500 ml-2">Forever</span>
                 </div>
-                <button className="w-full bg-gray-900 text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-800 transition-colors">
+                <button  className="w-full bg-gray-900 text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-800 transition-colors">
                   Get Started Free
                 </button>
               </div>

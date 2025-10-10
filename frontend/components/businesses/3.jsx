@@ -3,8 +3,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 // To use icons as seen in the images, install heroicons: npm install @heroicons/react
 import { ArrowUpTrayIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import { useRouter } from 'next/navigation';
 
 const DefineBrandForm = () => {
+  const router = useRouter();
+  
   // progress steps configuration (this page = step 3)
   const steps = ['Name & Website','Basic Info','Branding','Audience','Schedule'];
   const currentStep = 3;
@@ -12,32 +15,44 @@ const DefineBrandForm = () => {
 
   // --- 1. STATE MANAGEMENT for form inputs ---
   const [logo, setLogo] = useState(null);
-  const [primaryColor, setPrimaryColor] = useState('#3B82F6');
-  const [secondaryColor, setSecondaryColor] = useState('#EF4444');
-  const [brandTone, setBrandTone] = useState('Professional & Formal');
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [brandTone, setBrandTone] = useState('');
+
+  // Restore saved values on mount
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('onboardingStep3') || '{}');
+      if (saved.brandTone) setBrandTone(saved.brandTone);
+      if (saved.logo) setLogoPreview(saved.logo);
+    } catch (_) {}
+  }, []);
+
+  // Auto-save brand tone on change
+  useEffect(() => {
+    const existing = JSON.parse(sessionStorage.getItem('onboardingStep3') || '{}');
+    sessionStorage.setItem('onboardingStep3', JSON.stringify({ ...existing, brandTone }));
+  }, [brandTone]);
+
+  // Read selected logo file as Data URL and save immediately
+  useEffect(() => {
+    if (!logo) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      setLogoPreview(dataUrl);
+      const existing = JSON.parse(sessionStorage.getItem('onboardingStep3') || '{}');
+      sessionStorage.setItem('onboardingStep3', JSON.stringify({ ...existing, logo: dataUrl }));
+    };
+    reader.readAsDataURL(logo);
+  }, [logo]);
 
   // --- 2. HANDLE SUBMIT FUNCTION ---
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Save step 3 data to localStorage with backend field names
-    const reader = logo
-      ? new Promise((resolve) => {
-          const fr = new FileReader();
-          fr.onload = () => resolve(fr.result);
-          fr.readAsDataURL(logo);
-        })
-      : Promise.resolve(null);
-    reader.then((logoDataUrl) => {
-      const brandData = {
-        // logo: logoDataUrl, // If you want to store logo, add backend support for it
-        primaryBrandColor: primaryColor,
-        secondaryBrandColor: secondaryColor,
-        brandTone,
-      };
-      localStorage.setItem('onboardingStep3', JSON.stringify(brandData));
-      // Navigate to the next step
-      window.location.href = '/businesses/create/4';
-    });
+    // sessionStorage already contains latest logo and brandTone from effects
+    const existing = JSON.parse(sessionStorage.getItem('onboardingStep3') || '{}');
+    sessionStorage.setItem('onboardingStep3', JSON.stringify({ ...existing, brandTone }));
+    router.push('/businesses/create/4');
   };
 
   return (
@@ -83,19 +98,23 @@ const DefineBrandForm = () => {
 
               <form onSubmit={handleSubmit}>
                 <div className="space-y-6">
-                  {/* Upload box */}
+          {/* Upload box */}
                   <div>
                     {/* <label className="block text-sm font-medium text-slate-600 mb-2">Business Logo</label> */}
-                    <div className="rounded-lg border-2 border-dashed border-slate-200 p-6">
+            <div className="rounded-lg border-2 border-dashed border-slate-200 p-6">
                       <div className="flex items-center justify-center">
                         <div className="text-center">
                           <div className="w-48 h-28 rounded-md border border-slate-100 bg-slate-50 flex items-center justify-center mx-auto mb-3">
-                            <ArrowUpTrayIcon className="h-8 w-8 text-slate-400" />
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Logo preview" className="max-h-24 object-contain" />
+                    ) : (
+                      <ArrowUpTrayIcon className="h-8 w-8 text-slate-400" />
+                    )}
                           </div>
                           <div className="flex items-center justify-center gap-3">
                             <label htmlFor="file-upload" className="inline-flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm font-medium text-blue-600 hover:bg-slate-50 cursor-pointer">
                               Choose file
-                              <input id="file-upload" name="file-upload" type="file" className="sr-only" aria-label="Business Logo" onChange={e => setLogo(e.target.files[0])} />
+                      <input id="file-upload" name="file-upload" type="file" accept="image/*" className="sr-only" aria-label="Business Logo" onChange={e => setLogo(e.target.files[0])} />
                             </label>
                             <div className="text-sm text-slate-500">or drag and drop</div>
                           </div>
@@ -104,25 +123,6 @@ const DefineBrandForm = () => {
                       </div>
                     </div>
                     <p className="mt-2 text-xs text-slate-500">Upload your business logo (PNG, JPG, or SVG recommended)</p>
-                  </div>
-
-                  {/* Color inputs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="primary-color" className="block text-sm font-medium text-slate-600 mb-2">Primary Brand Color</label>
-                        <div>
-                          <input type="text" name="primary-color" id="primary-color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                        </div>
-                      <p className="mt-2 text-xs text-slate-500">Your main brand color (will be used in posts and templates)</p>
-                    </div>
-
-                    <div>
-                      <label htmlFor="secondary-color" className="block text-sm font-medium text-slate-600 mb-2">Secondary Color</label>
-                      <div>
-                        <input type="text" name="secondary-color" id="secondary-color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                      </div>
-                      <p className="mt-2 text-xs text-slate-500">Secondary accent color for variety in designs</p>
-                    </div>
                   </div>
 
                   {/* Custom Select (scrolls when many items) */}
@@ -136,7 +136,8 @@ const DefineBrandForm = () => {
 
                 {/* Actions */}
                 <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
-                  <button type="button" className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-slate-200 bg-white text-sm text-slate-700 hover:bg-slate-50">
+                  <button type="button" onClick={() => router.push('/businesses/create/2')}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-slate-200 bg-white text-sm text-slate-700 hover:bg-slate-50">
                     <ChevronLeftIcon className="h-4 w-4 text-slate-400" />
                     Back
                   </button>
@@ -159,12 +160,13 @@ export default DefineBrandForm;
 // Small custom dropdown component placed in the same file for convenience
 function BrandToneDropdown({ value, onValueChange }) {
   const options = [
+    '----',
     'Professional & Formal',
     'Casual & Friendly',
     'Witty & Humorous',
     'Inspirational & Uplifting',
     'Educational & Informative',
-    'Playful & Energetic',
+    'Playful & Energetic',  
     'Warm & Empathetic',  
     'Bold & Confident',
     'Minimal & Quiet',
@@ -172,7 +174,7 @@ function BrandToneDropdown({ value, onValueChange }) {
   ];
 
   const [open, setOpen] = useState(false);
-  const [highlighted, setHighlighted] = useState(options.indexOf(value) || 0);
+  const [highlighted, setHighlighted] = useState(options.indexOf(value || '----'));
   const btnRef = useRef(null);
   const panelRef = useRef(null);
 
@@ -196,7 +198,7 @@ function BrandToneDropdown({ value, onValueChange }) {
 
   useEffect(() => {
     // Keep highlighted in sync with value
-    const idx = options.indexOf(value);
+    const idx = options.indexOf(value || '----');
     if (idx !== -1) setHighlighted(idx);
   }, [value]);
 
@@ -233,7 +235,7 @@ function BrandToneDropdown({ value, onValueChange }) {
         onKeyDown={onKeyDown}
         className="w-full text-left rounded-md border border-slate-200 px-3 py-2 pr-10 bg-white flex items-center justify-between text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
       >
-        <span className="truncate">{value}</span>
+        <span className="truncate">{value || '----'}</span>
         <svg className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6 8l4 4 4-4" />
         </svg>
