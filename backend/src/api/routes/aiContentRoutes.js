@@ -53,29 +53,37 @@ const uploadImageToCloudinary = async (imageUrl) => {
 };
 
 /**
- * A specialized helper to get only hashtags for a specific platform.
+ * Generates platform-specific caption and hashtags while reusing the same core idea.
  */
-const callHashtagAI = async (platform, postContent) => {
+const callPlatformContentAI = async (platform, universalCaption) => {
   const prompt = `
-    Based on the following social media post, generate a JSON object with a single key "hashtags".
-    The value should be an array of 5-7 viral and trending hashtags tailored specifically for the ${platform} platform.
-    
-    Post Content: """${postContent}"""
-    
-    Your final output must be only the JSON object.
+    Rewrite the following caption to be optimised for ${platform}. Keep the original meaning but adapt tone, length and formatting for the platform.
+    Then produce 5-7 trending, relevant hashtags for ${platform}. Return JSON with keys: "caption" (string) and "hashtags" (array of strings, each beginning with '#').
+
+    Caption: """${universalCaption}"""
+
+    Only return the JSON object.
   `;
   const response = await axios.post(chatApiUrl, {
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: prompt }],
     response_format: { type: 'json_object' },
   }, { headers: { 'Authorization': `Bearer ${openaiApiKey}`, 'Content-Type': 'application/json' } });
-  
-  let result = JSON.parse(response.data.choices[0].message.content);
-  // Data cleaning for hashtags
-  if (result.hashtags && typeof result.hashtags === 'string') {
-    result.hashtags = result.hashtags.split(',').map(tag => tag.trim().replace(/^#/, '')).filter(tag => tag).map(tag => `#${tag}`);
-  }
-  return result;
+
+  const raw = JSON.parse(response.data.choices[0].message.content);
+  const cleaned = {
+    caption: typeof raw.caption === 'string' ? raw.caption : universalCaption,
+    hashtags: Array.isArray(raw.hashtags)
+      ? raw.hashtags.map(tag => String(tag).trim()).filter(Boolean)
+      : [],
+  };
+  // Normalise hashtags to include a single leading '#'
+  cleaned.hashtags = cleaned.hashtags.map(tag => {
+    const t = tag.replace(/^#+/, '');
+    return `#${t}`;
+  });
+
+  return cleaned;
 };
 
 
@@ -88,7 +96,7 @@ router.post('/create-content-plan', async (req, res) => {
   if (!brief || !platforms || !Array.isArray(platforms) || platforms.length === 0) {
     return res.status(400).json({ error: 'A brief and at least one platform are required.' });
   }
-  
+
   try {
     // --- Step 1: Generate the main content and image prompt ONCE ---
     const mainContentPrompt = `
@@ -98,31 +106,31 @@ router.post('/create-content-plan', async (req, res) => {
       Your final output must be only the JSON object.
     `;
     const mainContentResponse = await axios.post(chatApiUrl, {
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: mainContentPrompt }],
-        response_format: { type: 'json_object' },
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: mainContentPrompt }],
+      response_format: { type: 'json_object' },
     }, { headers: { 'Authorization': `Bearer ${openaiApiKey}`, 'Content-Type': 'application/json' } });
-    
+
     const { postContent, aiImagePrompt } = JSON.parse(mainContentResponse.data.choices[0].message.content);
 
     // --- Step 2: Generate and upload the single image ONCE ---
     const tempImageUrl = await callImageAI(aiImagePrompt);
     const finalImageUrl = await uploadImageToCloudinary(tempImageUrl);
 
-    // --- Step 3: Loop through platforms to get unique hashtags ---
-    const hashtagPromises = platforms.map(platform => callHashtagAI(platform, postContent));
-    const hashtagResults = await Promise.all(hashtagPromises);
+    // --- Step 3: For each platform, tailor caption + hashtags ---
+    const platformPromises = platforms.map(platform => callPlatformContentAI(platform, postContent));
+    const platformResults = await Promise.all(platformPromises);
 
     // --- Step 4: Combine everything into the final response ---
     const finalResponse = {
-      postContent: postContent,
       imageUrl: finalImageUrl,
       platforms: {},
     };
 
     platforms.forEach((platform, index) => {
       finalResponse.platforms[platform] = {
-        hashtags: hashtagResults[index].hashtags,
+        caption: platformResults[index].caption,
+        hashtags: platformResults[index].hashtags,
       };
     });
 

@@ -44,8 +44,8 @@ export default function ReviewDetails() {
 				setErrorMessage("Please complete all required fields marked with *.");
 				return;
 			}
-			// Save step 2 data to localStorage with backend field names
-			localStorage.setItem('onboardingStep2', JSON.stringify({
+			// Save step 2 data to sessionStorage with backend field names
+			sessionStorage.setItem('onboardingStep2', JSON.stringify({
 				businessDescription: description,
 				industry,
 				companySize

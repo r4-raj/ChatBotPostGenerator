@@ -42,8 +42,8 @@ export default function KnowAudienceForm() {
       setErrorMessage('Target Audience is required.');
       return;
     }
-    // Save step 4 data to localStorage with backend field names
-    localStorage.setItem('onboardingStep4', JSON.stringify({
+    // Save step 4 data to sessionStorage with backend field names
+    sessionStorage.setItem('onboardingStep4', JSON.stringify({
       targetAudience: audience,
       keyMessages,
       contentThemes

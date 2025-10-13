@@ -1,8 +1,7 @@
 "use client";
-import React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Plus, Instagram, Linkedin, Facebook, Twitter } from "lucide-react";
-import { useRouter } from 'next/navigation'; // Correct import for Next.js App Router
+import { useRouter } from 'next/navigation';
 
 // --- Platform Data ---
 const socialPlatforms = [
@@ -13,13 +12,42 @@ const socialPlatforms = [
 ];
 
 const GenerateAIContent = () => {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
   const [selectedPlatforms, setSelectedPlatforms] = useState({});
   const [brief, setBrief] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [result, setResult] = useState(null); // Optional: to show a temporary result on this page
+  const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const router = useRouter();
+
+  // Safely read JSON only if the response is JSON, otherwise return null
+  const readJsonSafely = async (response) => {
+    const contentType = response.headers?.get?.('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        return await response.json();
+      } catch (_) {
+        return null;
+      }
+    }
+    // Fallback: try to parse text as JSON, otherwise return null
+    try {
+      const text = await response.text();
+      return JSON.parse(text);
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const buildHttpError = async (response, defaultMessage) => {
+    const body = await readJsonSafely(response);
+    const messageFromBody = body?.message || body?.error || body?.detail;
+    const statusInfo = `(${response.status}${response.statusText ? ' ' + response.statusText : ''})`;
+    const err = new Error(messageFromBody || `${defaultMessage} ${statusInfo}`.trim());
+    err.status = response.status;
+    return err;
+  };
 
   const handlePlatformChange = (platformId) => {
     setSelectedPlatforms((prevSelected) => ({
@@ -28,25 +56,56 @@ const GenerateAIContent = () => {
     }));
   };
 
-  // Load history on mount
+  // --- Load history from the database on mount ---
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('generatedHistory') || '[]');
-      setHistory(Array.isArray(saved) ? saved : []);
-    } catch (_) {
-      setHistory([]);
-    }
-  }, []);
+    const fetchHistory = async () => {
+      try {
+        const token = sessionStorage.getItem('authToken'); // Get token from sessionStorage
+        if (!token) {
+          setError('Please log in to view your generated posts.');
+          router.push('/login');
+          return; // Do not proceed without a token
+        }
+
+        const response = await fetch(`${apiUrl}/posts`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          // Avoid parsing HTML error pages as JSON
+          throw await buildHttpError(response, 'Failed to fetch history.');
+        }
+
+        const postsFromDb = await readJsonSafely(response);
+        if (!postsFromDb) {
+          throw new Error('History response was not valid JSON.');
+        }
+        setHistory(postsFromDb);
+      } catch (err) {
+        console.error('Error fetching history:', err);
+        if (err?.status === 401 || err?.status === 403) {
+          try { sessionStorage.removeItem('authToken'); } catch (_) {}
+          setError('Your session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
+      }
+    };
+
+    fetchHistory();
+  }, [apiUrl, router]);
 
   /**
    * Helper function to save the generated content to the database.
-   * @param {object} generatedData - The data object received from the AI generation API.
-   * @param {string} token - The user's authentication token.
+
    */
+
   const saveContentToDb = async (generatedData, token) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const response = await fetch(`${apiUrl}/posts`, { // Calling the /posts endpoint
+      const response = await fetch(`${apiUrl}/posts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,16 +117,18 @@ const GenerateAIContent = () => {
       if (!response.ok) {
         throw new Error('Failed to save the post to the database.');
       }
-      console.log("Content saved to database successfully!");
+      const saved = await readJsonSafely(response);
+      console.log("Content saved to database successfully!", saved);
+      return saved?.post?._id;
     } catch (error) {
       console.error("Error saving to DB:", error.message);
-      // We can set an error state here to inform the user
       setError("Content was generated but failed to save. You can try saving it manually later.");
+      return null;
     }
   };
 
   /**
-   * Main function to handle the entire content generation and saving process.
+   * Main function to handle content generation and saving.
    */
   const handleGenerateContent = async (e) => {
     e.preventDefault();
@@ -76,11 +137,14 @@ const GenerateAIContent = () => {
     setResult(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const token = localStorage.getItem('authToken');
-      if (!token) throw new Error('No authentication token found. Please log in again.');
+      const token = sessionStorage.getItem('authToken');
+      if (!token) {
+        setError('Your session has ended. Please log in again.');
+        router.push('/login');
+        return; // Stop handling without token
+      }
 
-      // --- Step 1: Generate Content ---
+      // Step 1: Generate Content
       const generateResponse = await fetch(`${apiUrl}/create-content-plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -91,41 +155,44 @@ const GenerateAIContent = () => {
       });
 
       if (!generateResponse.ok) {
-        const errorData = await generateResponse.json();
-        throw new Error(errorData.message || 'Failed to generate content.');
+        const err = await buildHttpError(generateResponse, 'Failed to generate content.');
+        if (err?.status === 401 || err?.status === 403) {
+          try { sessionStorage.removeItem('authToken'); } catch (_) {}
+          setError('Your session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
+        throw err;
       }
-      const generatedData = await generateResponse.json();
-      setResult(generatedData); // Show temporary result on this page if needed
+      const generatedData = await readJsonSafely(generateResponse);
+      if (!generatedData) {
+        throw new Error('Generate response was not valid JSON.');
+      }
+      setResult(generatedData);
 
-      // --- Step 2: Save the successful result to the database ---
-      await saveContentToDb(generatedData, token);
-
-      // --- Step 3: Store in localStorage for the next page and navigate ---
-      localStorage.setItem('generatedContent', JSON.stringify(generatedData));
-
-      // Save lightweight entry to history for the Recent section
-      try {
-        const existing = JSON.parse(localStorage.getItem('generatedHistory') || '[]');
-        const firstPlatform = Object.keys(generatedData)[0];
-        const item = generatedData[firstPlatform];
-        const title = (item?.postContent || '').split('\n')[0].slice(0, 80);
-        const entry = {
-          id: Date.now(),
-          title: title || 'Generated Post',
-          preview: (item?.postContent || '').slice(0, 180),
-          createdAt: new Date().toISOString(),
-        };
-        const newHistory = [entry, ...(Array.isArray(existing) ? existing : [])].slice(0, 10);
-        localStorage.setItem('generatedHistory', JSON.stringify(newHistory));
-        setHistory(newHistory);
-      } catch (_) {}
-      router.push('/content/post');
+      // Step 2: Save the result to the database
+      const newPostId = await saveContentToDb(generatedData, token);
+      
+      // Step 3: Navigate to the editor page using the new post's ID.
+      if (newPostId) {
+        router.push(`/content/post?id=${newPostId}`);
+      } else {
+        // If saving failed, the error state is already set by saveContentToDb, so we just log and stay.
+        console.error("Could not get a new post ID, staying on page.");
+      }
 
     } catch (err) {
       setError(err.message);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  /**
+   * Handles clicking a "View" button on a history item.
+   */
+  const handleViewHistory = (post) => {
+    router.push(`/content/post?id=${post._id}`);
   };
 
   return (
@@ -196,7 +263,7 @@ const GenerateAIContent = () => {
           </button>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !brief.trim() || Object.values(selectedPlatforms).every(v => !v)}
             className="inline-flex items-center px-5 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             {isLoading ? (
@@ -217,19 +284,19 @@ const GenerateAIContent = () => {
         )}
       </div>
 
-      {/* Recent AI Generations - moved below Target Platforms */}
+      {/* Recent AI Generations - from the database */}
       <section className="mt-6">
         <h2 className="text-xl font-semibold text-slate-800 mb-3">Recent AI Generations</h2>
         {history && history.length > 0 ? (
           <div className="space-y-3">
             {history.map((h) => (
-              <div key={h.id} className="bg-blue-50/60 border border-blue-100 rounded-lg p-4 flex items-start justify-between">
+              <div key={h._id} className="bg-blue-50/60 border border-blue-100 rounded-lg p-4 flex items-start justify-between">
                 <div className="pr-4">
-                  <h3 className="font-medium text-blue-900 mb-1">{h.title}</h3>
-                  <p className="text-blue-800/80 text-sm line-clamp-1">{h.preview}</p>
+                  <h3 className="font-medium text-blue-900 mb-1">{(h.content?.postContent || 'Generated Post').slice(0, 60)}</h3>
+                  <p className="text-blue-800/80 text-sm line-clamp-1">{(h.content?.platforms ? Object.keys(h.content.platforms).join(', ') : '')}</p>
                   <p className="text-xs text-blue-700/70 mt-1">Generated {new Date(h.createdAt).toLocaleString()}</p>
                 </div>
-                <button onClick={() => router.push('/content/post')} className="text-blue-600 text-sm font-medium hover:underline whitespace-nowrap">View →</button>
+                <button onClick={() => handleViewHistory(h)} className="text-blue-600 text-sm font-medium hover:underline whitespace-nowrap">View →</button>
               </div>
             ))}
           </div>

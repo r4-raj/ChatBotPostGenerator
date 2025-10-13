@@ -4,11 +4,11 @@ const PostSchema = new mongoose.Schema({
   // This links the post to the user who created it
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // Assumes you have a 'User' model
+    ref: 'User', // This should match the name of your User model
     required: true,
   },
-  // This will store the generated content for all platforms
-  // e.g., { instagram: { postContent: '...', imageUrl: '...' }}
+  // This will store the generated content object from the AI
+  // e.g., { postContent: '...', imageUrl: '...', platforms: { ... } }
   content: {
     type: Object,
     required: true,

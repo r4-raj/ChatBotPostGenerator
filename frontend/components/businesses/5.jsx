@@ -49,7 +49,7 @@ export default function SetScheduleForm() {
     setError(null);
 
     try {
-      // Read all step data from localStorage
+      // Read all step data from sessionStorage
       const step1Data = JSON.parse(sessionStorage.getItem('onboardingStep1') || '{}');
       const step2Data = JSON.parse(sessionStorage.getItem('onboardingStep2') || '{}');
       const step3Data = JSON.parse(sessionStorage.getItem('onboardingStep3') || '{}');

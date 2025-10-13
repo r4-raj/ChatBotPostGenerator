@@ -4,7 +4,6 @@ const Profile = require('../../models/profileModel');
 // @route   GET /api/profile/me
 exports.getMyProfile = async (req, res) => {
   try {
-    // Find the profile linked to the logged-in user's ID
     const profile = await Profile.findOne({ user: req.user.id }).populate('user', ['firstName', 'email']);
 
     if (!profile) {
@@ -20,13 +19,14 @@ exports.getMyProfile = async (req, res) => {
 // @desc    Create or update a user's profile
 // @route   POST /api/profile
 exports.createOrUpdateProfile = async (req, res) => {
-  // Destructure all the expected fields from the form
+  // Destructure all expected fields, including the new businessLogo
   const {
     businessName,
     website,
     businessDescription,
     industry,
     companySize,
+    businessLogo, // <-- ADDED THIS LINE
     primaryBrandColor,
     secondaryBrandColor,
     brandTone,
@@ -45,6 +45,7 @@ exports.createOrUpdateProfile = async (req, res) => {
     businessDescription,
     industry,
     companySize,
+    businessLogo, // <-- ADDED THIS LINE
     primaryBrandColor,
     secondaryBrandColor,
     brandTone,
@@ -57,8 +58,7 @@ exports.createOrUpdateProfile = async (req, res) => {
   };
 
   try {
-    // Find the profile by the user's ID and update it.
-    // If it doesn't exist ('upsert: true'), create it.
+    // Find and update the profile, or create it if it doesn't exist
     let profile = await Profile.findOneAndUpdate(
       { user: req.user.id },
       { $set: profileFields },
@@ -70,4 +70,3 @@ exports.createOrUpdateProfile = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
-

@@ -57,7 +57,7 @@ export default function CreateBusiness() {
 		}
 
 		try {
-			// Save step 1 data to localStorage with correct field names for backend
+			// Save step 1 data to sessionStorage with correct field names for backend
       sessionStorage.setItem('onboardingStep1', JSON.stringify({ businessName, website: websiteUrl }));
 			await new Promise((resolve) => setTimeout(resolve, 500));
 			setIsSubmitted(true);

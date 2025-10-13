@@ -17,8 +17,7 @@ const profileSchema = new mongoose.Schema({
   companySize: { type: String },
 
   // --- From Step 3 ---
-  // Storing the logo URL. The actual file upload is handled separately.
-  businessLogo: { type: String }, 
+  businessLogo: { type: String }, // This field will store the Cloudinary URL
   primaryBrandColor: { type: String },
   secondaryBrandColor: { type: String },
   brandTone: { type: String },
